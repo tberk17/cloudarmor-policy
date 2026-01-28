@@ -1,5 +1,5 @@
-
-= "GCP project ID where Infra Manager will deploy"
+variable "project_id" {
+  description = "GCP project ID where Infra Manager will deploy"
   type        = string
 }
 
