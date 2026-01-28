@@ -37,4 +37,3 @@ resource "google_compute_region_security_policy_rule" "allow_corp_nat" {
     }
   }
 }
-``
