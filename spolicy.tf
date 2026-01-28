@@ -1,48 +1,40 @@
-// spolicy.tf
-// Cloud Armor security policy (module-managed)
+# spolicy.tf (regional Cloud Armor policy + rules)
 
-module "security_policy" {
-  source  = "GoogleCloudPlatform/cloud-armor/google"
-  version = "~> 7.0"  # current major from the official module registry
-
-  project_id  = var.project_id
-  name        = "my-test-security-policy"
-  description = "Test Security Policy"
+# Regional Cloud Armor policy (CLOUD_ARMOR backend policy)
+resource "google_compute_region_security_policy" "waf" {
+  name        = "baseline-web-waf-regional"
+  description = "Baseline WAF policy (regional)"
+  region      = var.region            # e.g., "europe-west1"
   type        = "CLOUD_ARMOR"
+}
 
-  # Baseline behavior; allow unless a rule matches
-  default_rule_action = "allow"
+# Example: OWASP/SQLi rule in preview (log-only)
+resource "google_compute_region_security_policy_rule" "sqli_preview" {
+  region          = var.region
+  security_policy = google_compute_region_security_policy.waf.name
+  priority        = 10
+  action          = "deny(403)"
+  preview         = true
 
-  # Layer-7 DDoS visibility settings (optional)
-  layer_7_ddos_defense_enable          = true
-  layer_7_ddos_defense_rule_visibility = "STANDARD"
-
-  # --- Start WAF rules in preview (log-only) ---
-  # Recommended rollout: preview first, tune from logs, then enforce. 
-  # (Set preview = false to enforce when you're ready.)
-  pre_configured_rules = {
-    sqli_v33 = {
-      action            = "deny(403)"
-      priority          = 1
-      target_rule_set   = "sqli-v33-stable"
-      sensitivity_level = 4
-      preview           = true
+  # Use preconfigured WAF expression IDs (example shown)
+  match {
+    preconfigured_waf_config {
+      # replace/add IDs from the OWASP CRS v3.3 SQLi set as needed
+      expression_ids = ["owasp-crs-v033-Id942100-sqli"]
     }
   }
+}
 
-  # --- Example exemption / allowlist ---
-  # Keep exemptions explicit with clear descriptions & distinct priorities.
-  security_rules = {
-    allow_corp_nat = {
-      action        = "allow"
-      priority      = 100
-      src_ip_ranges = ["203.0.113.0/24"]
-      description   = "Team exemption: corporate NAT"
-      preview       = false
-    }
+# Example exemption / allowlist (corp NAT), high priority
+resource "google_compute_region_security_policy_rule" "allow_corp_nat" {
+  region          = var.region
+  security_policy = google_compute_region_security_policy.waf.name
+  priority        = 100
+  action          = "allow"
+  preview         = false
+
+  match {
+    versioned_expr = "SRC_IPS_V1"
+    config { src_ip_ranges = ["203.0.113.0/24"] }
   }
-
-  # You can also add:
-  # custom_rules = { ... }                 # CEL expressions
-  # threat_intelligence_rules = { ... }    # requires enterprise features
 }
