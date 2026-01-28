@@ -35,22 +35,6 @@ module "security_policy" {
   # (optional) custom_rules / threat_intelligence_rules…
 }
 
-resource "google_compute_http_health_check" "hc" {
-  name         = "dummy-hc"
-  request_path = "/"
-}
-
-resource "google_compute_backend_service" "default" {
-  name                    = "dummy-backend-service"
-  project                 = var.project_id
-  protocol                = "HTTP"
-  port_name               = "http"
-  timeout_sec             = 30
-  session_affinity        = "NONE"
-  connection_draining_timeout_sec = 0
-  load_balancing_scheme   = "EXTERNAL"
-
-  health_checks = [google_compute_http_health_check.hc.id]
 
   # Enable LB request logging
   log_config {
