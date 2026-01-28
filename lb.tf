@@ -25,20 +25,18 @@ resource "google_compute_region_backend_service" "web_backend" {
 
   health_checks = [google_compute_region_health_check.hc.id]
 
-  # Enable LB request logging so Cloud Armor per-request logs appear
+  # Enable LB request logging so Cloud Armor per-request logs appear in Cloud Logging
   log_config {
     enable      = true
     sample_rate = 1.0
   }
 
-  # >>> Your instance group self link (europe-west1-b) <<<
+  # >>> Your existing instance group (unmanaged); keep ONLY 'group' <<<
   backend {
-    group           = "https://www.googleapis.com/compute/v1/projects/cf-ciso-common-sandbo-nh/zones/europe-west1-b/instanceGroups/instance-group-1"
-    balancing_mode  = "UTILIZATION"
-    capacity_scaler = 1.0
+    group = "https://www.googleapis.com/compute/v1/projects/cf-ciso-common-sandbo-nh/zones/europe-west1-b/instanceGroups/instance-group-1"
   }
 
-  # ATTACH Regional Cloud Armor (self_link)
+  # Attach the REGIONAL Cloud Armor policy by self_link
   security_policy = google_compute_region_security_policy.waf.self_link
 }
 
@@ -62,9 +60,9 @@ resource "google_compute_region_target_http_proxy" "proxy" {
 
 # Regional forwarding rule (public IP on port 80)
 resource "google_compute_forwarding_rule" "http_fr" {
-  name       = "web-http-fr-regional"
-  region     = var.region
+  name                 = "web-http-fr-regional"
+  region               = var.region
   load_balancing_scheme = "EXTERNAL"
-  target     = google_compute_region_target_http_proxy.proxy.id
-  port_range = "80"
+  target               = google_compute_region_target_http_proxy.proxy.id
+  port_range           = "80"
 }
