@@ -10,7 +10,6 @@ module "security_policy" {
   layer_7_ddos_defense_enable          = true
   layer_7_ddos_defense_rule_visibility = "STANDARD"
   
-  [...]
 
   pre_configured_rules = { 
     	"sqli_sensitivity_level_4" = {
