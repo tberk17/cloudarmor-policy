@@ -1,4 +1,4 @@
-module "security_policy" { ①
+module "security_policy" { 
   source  = "GoogleCloudPlatform/cloud-armor/google"
   version = ">= 0.1.0"
  
@@ -12,7 +12,7 @@ module "security_policy" { ①
   
   [...]
 
-  pre_configured_rules = { ②
+  pre_configured_rules = { 
     	"sqli_sensitivity_level_4" = {
       	action          = "deny(502)"
       	priority        = 1
@@ -28,7 +28,7 @@ module "security_policy" { ①
   threat_intelligence_rules = {
 	    [...]
 	}  
-resource "google_compute_backend_service" "default" { ③
+resource "google_compute_backend_service" "default" { 
   name                            = "dummy-backend-service"
   connection_draining_timeout_sec = 0
   load_balancing_scheme           = "EXTERNAL_MANAGED"
