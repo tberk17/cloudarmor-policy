@@ -6,7 +6,7 @@ resource "google_compute_region_security_policy" "waf" {
   type        = "CLOUD_ARMOR"
 }
 
-# OWASP SQLi rule in preview (log-only) — safe rollout
+# OWASP SQLi (CRS 3.3) in PREVIEW (log-only) via CEL
 resource "google_compute_region_security_policy_rule" "sqli_preview" {
   region          = var.region
   security_policy = google_compute_region_security_policy.waf.name
@@ -15,14 +15,14 @@ resource "google_compute_region_security_policy_rule" "sqli_preview" {
   preview         = true
 
   match {
-    # Evaluate OWASP CRS 3.3 SQLi rule set (sensitivity 4)
+    # Evaluate the preconfigured WAF rule set with sensitivity tuning
     expr {
       expression = "evaluatePreconfiguredWaf('sqli-v33-stable', {'sensitivity': 4})"
     }
   }
 }
 
-# Example exemption / allowlist for a corporate NAT
+# Example exemption / allowlist rule (team-specific)
 resource "google_compute_region_security_policy_rule" "allow_corp_nat" {
   region          = var.region
   security_policy = google_compute_region_security_policy.waf.name
@@ -33,7 +33,8 @@ resource "google_compute_region_security_policy_rule" "allow_corp_nat" {
   match {
     versioned_expr = "SRC_IPS_V1"
     config {
-      src_ip_ranges = ["203.0.113.0/24"]
+      src_ip_ranges = ["203.0.113.0/24"] # change/remove to fit your exemptions
     }
   }
 }
+``
