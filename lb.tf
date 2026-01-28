@@ -62,4 +62,3 @@ resource "google_compute_global_forwarding_rule" "http_fr" {
   target     = google_compute_target_http_proxy.proxy.id
   port_range = "80"
 }
-``
