@@ -1,16 +1,25 @@
+// spolicy.tf
+// Cloud Armor security policy (module-managed)
+
 module "security_policy" {
   source  = "GoogleCloudPlatform/cloud-armor/google"
-  version = "~> 7.0"
+  version = "~> 7.0"  # current major from the official module registry
 
-  project_id                           = var.project_id
-  name                                 = "my-test-security-policy"
-  description                          = "Test Security Policy"
-  default_rule_action                  = "allow"
-  type                                 = "CLOUD_ARMOR"
+  project_id  = var.project_id
+  name        = "my-test-security-policy"
+  description = "Test Security Policy"
+  type        = "CLOUD_ARMOR"
+
+  # Baseline behavior; allow unless a rule matches
+  default_rule_action = "allow"
+
+  # Layer-7 DDoS visibility settings (optional)
   layer_7_ddos_defense_enable          = true
   layer_7_ddos_defense_rule_visibility = "STANDARD"
 
-  # Start WAF rules in preview
+  # --- Start WAF rules in preview (log-only) ---
+  # Recommended rollout: preview first, tune from logs, then enforce. 
+  # (Set preview = false to enforce when you're ready.)
   pre_configured_rules = {
     sqli_v33 = {
       action            = "deny(403)"
@@ -21,7 +30,8 @@ module "security_policy" {
     }
   }
 
-  # Example exemption / allowlist
+  # --- Example exemption / allowlist ---
+  # Keep exemptions explicit with clear descriptions & distinct priorities.
   security_rules = {
     allow_corp_nat = {
       action        = "allow"
@@ -32,16 +42,7 @@ module "security_policy" {
     }
   }
 
-  # (optional) custom_rules / threat_intelligence_rules…
-}
-
-
-  # Enable LB request logging
-  log_config {
-    enable      = true
-    sample_rate = 1.0
-  }
-
-  # ATTACH Cloud Armor (use self_link, not name)
-  security_policy = module.security_policy.policy.self_link
+  # You can also add:
+  # custom_rules = { ... }                 # CEL expressions
+  # threat_intelligence_rules = { ... }    # requires enterprise features
 }
