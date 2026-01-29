@@ -12,4 +12,4 @@ output "https_url" {
   description = "HTTPS URL (if domain set)"
   value       = var.domain != "" ? "https://${var.domain}" : null
 }
-``
+
