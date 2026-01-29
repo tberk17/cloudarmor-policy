@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
 # Create a Cloud Armor implementing METROs baseline.
 module "cloudarmor_policy" {
   source     = "metro-digital/cf-cloudarmor-policy/google"
