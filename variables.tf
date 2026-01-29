@@ -4,7 +4,7 @@
 ###############################################
 
 # === Project / location ===
-variable "project_id" {
+variable "projectId" {
   description = "GCP project ID where resources are created"
   type        = string
 }
@@ -14,32 +14,31 @@ variable "region" {
   type        = string
 }
 
-# Use gcp_zone (we avoid 'zone' since your deployment UI rejected it)
-variable "gcp_zone" {
+variable "gcpZone" {
   description = "Zone where your existing VM / instance group lives (e.g., europe-west1-b)"
   type        = string
 }
 
 # === Existing backend (you already have this IG) ===
-variable "instance_group" {
+variable "instanceGroup" {
   description = "Name of the existing unmanaged instance group"
   type        = string
 }
 
 # === Load balancer settings ===
-variable "service_port" {
-  description = "Port your app listens on (must match the IG named port 'http:<service_port>')"
+variable "servicePort" {
+  description = "Port your app listens on (must match the IG named port 'http:<servicePort>')"
   type        = number
   default     = 80
 }
 
-variable "health_check_path" {
+variable "healthCheckPath" {
   description = "HTTP path used by the health checker (should return 200 OK)"
   type        = string
   default     = "/"
 }
 
-variable "lb_name_prefix" {
+variable "lbNamePrefix" {
   description = "Prefix for LB resource names"
   type        = string
   default     = "app"
@@ -52,3 +51,4 @@ variable "domain" {
   type        = string
   default     = ""
 }
+``
