@@ -324,3 +324,48 @@ variable "security_rules" {
   }))
   default = {}
 }
+
+
+# === Load Balancer inputs ===
+variable "region" {
+  description = "Region for any regional resources"
+  type        = string
+}
+
+variable "zone" {
+  description = "Zone where your existing VM lives"
+  type        = string
+}
+
+variable "vm_name" {
+  description = "Name of the existing VM to put behind the LB"
+  type        = string
+}
+
+variable "service_port" {
+  description = "Port your app listens on the VM"
+  type        = number
+  default     = 80
+}
+
+variable "health_check_path" {
+  description = "HTTP path used by the health checker"
+  type        = string
+  default     = "/"
+}
+
+variable "lb_name_prefix" {
+  description = "Prefix for LB resource names"
+  type        = string
+  default     = "app"
+}
+
+# Optional for HTTPS
+variable "domain" {
+  description = "FQDN for managed SSL cert (optional). Leave empty if HTTP-only."
+  type        = string
+  default     = ""
+}
+
+
+
