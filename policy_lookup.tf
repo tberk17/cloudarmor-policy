@@ -1,4 +1,5 @@
-data "google_compute_security_policy" "baseline" {
-  name    = var.name        # must match the policy name passed to your module (default: "metro-baseline")
+# Get the policy that the module just created (by name)
+data "google_compute_security_policy" "policy" {
+  name    = local.policy_name
   project = var.project_id
 }
