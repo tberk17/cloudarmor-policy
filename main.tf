@@ -2,7 +2,7 @@ module "security_policy" {
   source  = "GoogleCloudPlatform/cloud-armor/google"
   version = "7.0.0"
 
-  project_id          = local.project_id
+  project_id          = var.project_id
   name                = "my-test-security-policy"
   description         = "Test Security Policy"
   default_rule_action = "allow"
@@ -171,7 +171,7 @@ resource "google_compute_backend_service" "default" {
   protocol                        = "HTTP"
   session_affinity                = "NONE"
   timeout_sec                     = 30
-  project                         = local.project_id
+  project                         = var.project_id
 
   # ✅ Attach the created policy by self link output from the module, not the name string
   security_policy = module.security_policy.security_policy
