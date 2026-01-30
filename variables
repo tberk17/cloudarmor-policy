@@ -1,16 +1,25 @@
-variable "project_id" { type = string }
+variable "project_id" {
+  type = string
+}
 
 variable "region" {
   type        = string
   description = "GCP region"
 }
-variable "instance_group_name" { type = string }
-variable "instance_group_zone" { type = string }
+
+variable "instance_group_name" {
+  type = string
+}
+
+variable "instance_group_zone" {
+  type = string
+}
 
 variable "backend_named_port_name" {
   type    = string
   default = "http"
 }
+
 variable "backend_named_port" {
   type    = number
   default = 80
