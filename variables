@@ -1,7 +1,8 @@
 variable "project_id" { type = string }
+
 variable "region" {
-  type    = string
-  default = "europe-west1"
+  type        = string
+  description = "GCP region"
 }
 variable "instance_group_name" { type = string }
 variable "instance_group_zone" { type = string }
