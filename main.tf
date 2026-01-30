@@ -173,6 +173,5 @@ resource "google_compute_backend_service" "default" {
   timeout_sec                     = 30
   project                         = var.project_id
 
-  # ✅ Attach the created policy by self link output from the module, not the name string
-  security_policy = module.security_policy.security_policy
+  
 }
