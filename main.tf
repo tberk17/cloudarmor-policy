@@ -48,7 +48,6 @@ resource "google_compute_instance_group_named_port" "ig_named_port" {
 
 ###############################################################################
 # Regional Cloud Armor policy (REGIONAL submodule)
-# NOTE: Provide recaptcha_redirect_site_key if you keep redirect rules.
 ###############################################################################
 resource "random_id" "suffix" {
   byte_length = 4
@@ -56,19 +55,19 @@ resource "random_id" "suffix" {
 
 module "regional_cloud_armor" {
   source  = "GoogleCloudPlatform/cloud-armor/google//modules/regional-backend-security-policy"
-  version = "~> 7.0" # uses the module with regional policy support [1](https://github.com/GoogleCloudPlatform/terraform-google-cloud-armor)
+  version = "~> 7.0"
 
   project_id = var.project_id
   region     = var.region
 
   name        = "regional-casp-policy-${random_id.suffix.hex}"
-  description = "Regional Cloud Armor policy (migrated from your global example)"
-  type        = "CLOUD_ARMOR"
+  description = "Regional Cloud Armor policy"
 
-  # If you want to use GOOGLE_RECAPTCHA redirects in rules below, set:
-  # recaptcha_redirect_site_key = "<projects/.../keys/...>"
+  type = "CLOUD_ARMOR"
 
-  # --- Preconfigured WAF Rules (kept) ---
+  #########################################################################
+  # Preconfigured WAF Rules
+  #########################################################################
   pre_configured_rules = {
     xss-stable_level_2_with_exclude = {
       action            = "deny(502)"
@@ -78,9 +77,10 @@ module "regional_cloud_armor" {
       sensitivity_level = 2
       exclude_target_rule_ids = [
         "owasp-crs-v030301-id941380-xss",
-        "owasp-crs-v030301-id941280-xss",
+        "owasp-crs-v030301-id941280-xss"
       ]
     }
+
     php-stable_level_0_with_include = {
       action                  = "deny(502)"
       priority                = 3
@@ -88,12 +88,14 @@ module "regional_cloud_armor" {
       target_rule_set         = "php-v33-stable"
       include_target_rule_ids = [
         "owasp-crs-v030301-id933190-php",
-        "owasp-crs-v030301-id933111-php",
+        "owasp-crs-v030301-id933111-php"
       ]
     }
   }
 
-  # --- Security Rules (kept) ---
+  #########################################################################
+  # Security Rules
+  #########################################################################
   security_rules = {
     allow_whitelisted_ip_ranges = {
       action        = "allow"
@@ -109,13 +111,13 @@ module "regional_cloud_armor" {
       description   = "Redirect IP address from project drop"
       src_ip_ranges = ["190.217.68.212", "45.116.227.69"]
       redirect_type = "GOOGLE_RECAPTCHA"
-      # Requires: recaptcha_redirect_site_key at module level
+      # requires recaptcha_redirect_site_key
     }
 
     rate_ban_project_dropthirty = {
       action        = "rate_based_ban"
       priority      = 13
-      description   = "Rate based ban for address from project dropthirty only if they cross ban threshold"
+      description   = "Rate based ban for specific addresses"
       src_ip_ranges = ["190.217.68.213", "45.116.227.70"]
       rate_limit_options = {
         ban_duration_sec                     = 300
@@ -131,7 +133,7 @@ module "regional_cloud_armor" {
     throttle_project_droptwenty = {
       action        = "throttle"
       priority      = 14
-      description   = "Throttle IP addresses from project droptwenty"
+      description   = "Throttle IP addresses"
       src_ip_ranges = ["190.217.68.214", "45.116.227.71"]
       rate_limit_options = {
         exceed_action                        = "deny(502)"
@@ -141,22 +143,25 @@ module "regional_cloud_armor" {
     }
   }
 
-  # --- Custom Rules (kept) ---
+  #########################################################################
+  # Custom Rules
+  #########################################################################
   custom_rules = {
     allow_specific_regions = {
       action      = "allow"
       priority    = 21
-      description = "Allow specific Regions"
+      description = "Allow specific regions"
       expression  = <<-EOT
         '[US,AU,BE]'.contains(origin.region_code)
       EOT
     }
+
     throttle_specific_ip = {
       action      = "throttle"
       priority    = 23
-      description = "Throttle specific IP address in US Region"
+      description = "Throttle specific IP in US region"
       expression  = <<-EOT
-        origin.region_code == "US" && inIpRange(origin.ip, '47.185.201.159/32')
+        origin.region_code == "US" && inIpRange(origin.ip, "47.185.201.159/32")
       EOT
       rate_limit_options = {
         exceed_action                        = "deny(502)"
@@ -164,11 +169,12 @@ module "regional_cloud_armor" {
         rate_limit_http_request_interval_sec = 60
       }
     }
+
     rate_ban_specific_ip = {
       action     = "rate_based_ban"
       priority   = 24
       expression = <<-EOT
-        inIpRange(origin.ip, '47.185.201.160/32')
+        inIpRange(origin.ip, "47.185.201.160/32")
       EOT
       rate_limit_options = {
         ban_duration_sec                     = 120
@@ -180,24 +186,30 @@ module "regional_cloud_armor" {
         ban_http_request_interval_sec        = 600
       }
     }
+
     test-sl = {
       action      = "deny(502)"
       priority    = 100
-      description = "test Sensitivity level policies"
       preview     = true
+      description = "Test SQLi sensitivity"
       expression  = <<-EOT
-        evaluatePreconfiguredWaf('sqli-v33-stable', {'sensitivity': 4, 'opt_out_rule_ids': ['owasp-crs-v030301-id942350-sqli', 'owasp-crs-v030301-id942360-sqli']})
+        evaluatePreconfiguredWaf(
+          "sqli-v33-stable",
+          {
+            "sensitivity": 4,
+            "opt_out_rule_ids": [
+              "owasp-crs-v030301-id942350-sqli",
+              "owasp-crs-v030301-id942360-sqli"
+            ]
+          }
+        )
       EOT
     }
   }
-
-  # NOTE: Adaptive Protection auto-deploy removed here (global-only feature). [1](https://github.com/GoogleCloudPlatform/terraform-google-cloud-armor)
-  # NOTE: If you use Threat Intelligence rules and have Enterprise, we can try to port them;
-  #       support varies—happy to add once you confirm subscription.
 }
 
 ###############################################################################
-# Regional Health Check (Envoy / Regional External HTTP LB)
+# Regional Health Check
 ###############################################################################
 resource "google_compute_region_health_check" "hc" {
   name   = "app-hc"
@@ -216,7 +228,7 @@ resource "google_compute_region_health_check" "hc" {
 }
 
 ###############################################################################
-# Regional Backend Service (attach REGIONAL Cloud Armor policy here)
+# Regional Backend Service with Cloud Armor
 ###############################################################################
 resource "google_compute_region_backend_service" "backend" {
   provider              = google-beta
@@ -235,12 +247,11 @@ resource "google_compute_region_backend_service" "backend" {
     capacity_scaler = 1.0
   }
 
-  # Attach the REGIONAL Cloud Armor policy
-  security_policy = module.regional_cloud_armor.policy.self_link  # [1](https://github.com/GoogleCloudPlatform/terraform-google-cloud-armor)
+  security_policy = module.regional_cloud_armor.policy.self_link
 }
 
 ###############################################################################
-# Regional URL Map / Target Proxy / Forwarding Rule (HTTP)
+# URL Map, Proxy, Forwarding Rule
 ###############################################################################
 resource "google_compute_region_url_map" "url_map" {
   name   = "app-url-map"
@@ -250,12 +261,11 @@ resource "google_compute_region_url_map" "url_map" {
 }
 
 resource "google_compute_region_target_http_proxy" "http_proxy" {
-  name   = "app-http-proxy"
-  region = var.region
+  name    = "app-http-proxy"
+  region  = var.region
   url_map = google_compute_region_url_map.url_map.id
 }
 
-# Regional static IP for the LB
 resource "google_compute_address" "lb_ip" {
   name   = "app-lb-ip"
   region = var.region
