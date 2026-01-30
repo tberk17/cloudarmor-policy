@@ -1,18 +1,20 @@
-module "security_policy" { 
+module "security_policy" {
   source  = "GoogleCloudPlatform/cloud-armor/google"
-  version = ">= 0.1.0"
-  project_id                           = local.project_id 
-  name                                 = "my-test-security-policy"
-  description                          = "Test Security Policy"
-  default_rule_action                  = "allow"
-  type                                 = "CLOUD_ARMOR"
-  layer_7_ddos_defense_enable          = true
+  version = "7.0.0"
+
+  project_id          = local.project_id
+  name                = "my-test-security-policy"
+  description         = "Test Security Policy"
+  default_rule_action = "allow"
+  type                = "CLOUD_ARMOR"
+
+  # IMPORTANT:
+  # Module docs state L7 DDoS (Adaptive Protection) is only supported for GLOBAL security policies of type CLOUD_ARMOR.
+  # If you're using a regional external ALB, keep this false. [1](https://docs.cloud.google.com/load-balancing/docs/https/ext-http-lb-tf-module-examples)
+  layer_7_ddos_defense_enable          = false
   layer_7_ddos_defense_rule_visibility = "STANDARD"
 
-
-
-
-threat_intelligence_rules = {
+  threat_intelligence_rules = {
     malicious_ips = {
       action      = "deny(403)"
       priority    = 1100
@@ -57,8 +59,8 @@ threat_intelligence_rules = {
     }
   }
 
-
-re_configured_rules = {
+  # FIXED NAME: pre_configured_rules (not re_configured_rules) [1](https://docs.cloud.google.com/load-balancing/docs/https/ext-http-lb-tf-module-examples)
+  pre_configured_rules = {
     waf_sqli = {
       action            = "deny(403)"
       priority          = 3000
@@ -156,9 +158,10 @@ re_configured_rules = {
     }
   }
 
-  
   security_rules = {}
   custom_rules   = {}
+} # ✅ IMPORTANT: closes the module block
+
 
 resource "google_compute_backend_service" "default" {
   name                            = "dummy-backend-service"
@@ -168,7 +171,8 @@ resource "google_compute_backend_service" "default" {
   protocol                        = "HTTP"
   session_affinity                = "NONE"
   timeout_sec                     = 30
-  security_policy                 = "my-test-security-policy" 
   project                         = local.project_id
-}
 
+  # ✅ Attach the created policy by self link output from the module, not the name string
+  security_policy = module.security_policy.security_policy
+}
