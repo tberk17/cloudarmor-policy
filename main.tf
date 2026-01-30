@@ -1,294 +1,174 @@
-###############################################################################
-# Providers & API
-###############################################################################
-terraform {
-  required_version = ">= 1.3.0"
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = ">= 5.30.0"
-    }
-    google-beta = {
-      source  = "hashicorp/google-beta"
-      version = ">= 5.30.0"
-    }
-  }
-}
+module "security_policy" { 
+  source  = "GoogleCloudPlatform/cloud-armor/google"
+  version = ">= 0.1.0"
+  project_id                           = local.project_id 
+  name                                 = "my-test-security-policy"
+  description                          = "Test Security Policy"
+  default_rule_action                  = "allow"
+  type                                 = "CLOUD_ARMOR"
+  layer_7_ddos_defense_enable          = true
+  layer_7_ddos_defense_rule_visibility = "STANDARD"
 
-provider "google" {
-  project = var.project_id
-  region  = var.region
-}
 
-provider "google-beta" {
-  project = var.project_id
-  region  = var.region
-}
 
-resource "google_project_service" "compute" {
-  project = var.project_id
-  service = "compute.googleapis.com"
-}
 
-###############################################################################
-# Existing unmanaged instance group
-###############################################################################
-data "google_compute_instance_group" "app" {
-  name = var.instance_group_name
-  zone = var.instance_group_zone
-}
-
-# Add required named port to the unmanaged IG
-resource "google_compute_instance_group_named_port" "ig_named_port" {
-  group = data.google_compute_instance_group.app.name
-  zone  = var.instance_group_zone
-  name  = var.backend_named_port_name
-  port  = var.backend_named_port
-}
-
-###############################################################################
-# Regional Cloud Armor policy (REGIONAL submodule)
-###############################################################################
-resource "random_id" "suffix" {
-  byte_length = 4
-}
-
-module "regional_cloud_armor" {
-  source  = "GoogleCloudPlatform/cloud-armor/google//modules/regional-backend-security-policy"
-  version = "~> 7.0"
-
-  project_id = var.project_id
-  region     = var.region
-
-  name        = "regional-casp-policy-${random_id.suffix.hex}"
-  description = "Regional Cloud Armor policy"
-
-  type = "CLOUD_ARMOR"
-
-  #########################################################################
-  # Preconfigured WAF Rules
-  #########################################################################
-  pre_configured_rules = {
-    xss-stable_level_2_with_exclude = {
-      action            = "deny(502)"
-      priority          = 2
-      preview           = true
-      target_rule_set   = "xss-v33-stable"
-      sensitivity_level = 2
-      exclude_target_rule_ids = [
-        "owasp-crs-v030301-id941380-xss",
-        "owasp-crs-v030301-id941280-xss"
-      ]
+threat_intelligence_rules = {
+    malicious_ips = {
+      action      = "deny(403)"
+      priority    = 1100
+      feed        = "iplist-known-malicious-ips"
+      description = "Deny traffic from known malicious IPs"
     }
 
-    php-stable_level_0_with_include = {
-      action                  = "deny(502)"
-      priority                = 3
-      description             = "PHP Sensitivity Level 0 with included rules"
-      target_rule_set         = "php-v33-stable"
-      include_target_rule_ids = [
-        "owasp-crs-v030301-id933190-php",
-        "owasp-crs-v030301-id933111-php"
-      ]
-    }
-  }
-
-  #########################################################################
-  # Security Rules
-  #########################################################################
-  security_rules = {
-    allow_whitelisted_ip_ranges = {
-      action        = "allow"
-      priority      = 11
-      description   = "Allow whitelisted IP address ranges"
-      src_ip_ranges = ["190.210.69.12"]
-      preview       = false
+    crypto_miners = {
+      action      = "deny(403)"
+      priority    = 1200
+      feed        = "iplist-crypto-miners"
+      description = "Deny traffic from known crypto miners IP list"
     }
 
-    redirect_project_drop = {
-      action        = "redirect"
-      priority      = 12
-      description   = "Redirect IP address from project drop"
-      src_ip_ranges = ["190.217.68.212", "45.116.227.69"]
-      redirect_type = "GOOGLE_RECAPTCHA"
-      # requires recaptcha_redirect_site_key
-    }
-
-    rate_ban_project_dropthirty = {
-      action        = "rate_based_ban"
-      priority      = 13
-      description   = "Rate based ban for specific addresses"
-      src_ip_ranges = ["190.217.68.213", "45.116.227.70"]
-      rate_limit_options = {
-        ban_duration_sec                     = 300
-        enforce_on_key                       = "ALL"
-        exceed_action                        = "deny(502)"
-        rate_limit_http_request_count        = 10
-        rate_limit_http_request_interval_sec = 60
-        ban_http_request_count               = 1000
-        ban_http_request_interval_sec        = 300
-      }
-    }
-
-    throttle_project_droptwenty = {
-      action        = "throttle"
-      priority      = 14
-      description   = "Throttle IP addresses"
-      src_ip_ranges = ["190.217.68.214", "45.116.227.71"]
-      rate_limit_options = {
-        exceed_action                        = "deny(502)"
-        rate_limit_http_request_count        = 10
-        rate_limit_http_request_interval_sec = 60
-      }
-    }
-  }
-
-  #########################################################################
-  # Custom Rules
-  #########################################################################
-  custom_rules = {
-    allow_specific_regions = {
-      action      = "allow"
-      priority    = 21
-      description = "Allow specific regions"
-      expression  = <<-EOT
-        '[US,AU,BE]'.contains(origin.region_code)
-      EOT
-    }
-
-    throttle_specific_ip = {
-      action      = "throttle"
-      priority    = 23
-      description = "Throttle specific IP in US region"
-      expression  = <<-EOT
-        origin.region_code == "US" && inIpRange(origin.ip, "47.185.201.159/32")
-      EOT
-      rate_limit_options = {
-        exceed_action                        = "deny(502)"
-        rate_limit_http_request_count        = 10
-        rate_limit_http_request_interval_sec = 60
-      }
-    }
-
-    rate_ban_specific_ip = {
-      action     = "rate_based_ban"
-      priority   = 24
-      expression = <<-EOT
-        inIpRange(origin.ip, "47.185.201.160/32")
-      EOT
-      rate_limit_options = {
-        ban_duration_sec                     = 120
-        enforce_on_key                       = "ALL"
-        exceed_action                        = "deny(502)"
-        rate_limit_http_request_count        = 10
-        rate_limit_http_request_interval_sec = 60
-        ban_http_request_count               = 10000
-        ban_http_request_interval_sec        = 600
-      }
-    }
-
-    test-sl = {
-      action      = "deny(502)"
-      priority    = 100
+    vpn_providers = {
+      action      = "deny(403)"
+      priority    = 1300
+      feed        = "iplist-vpn-providers"
       preview     = true
-      description = "Test SQLi sensitivity"
-      expression  = <<-EOT
-        evaluatePreconfiguredWaf(
-          "sqli-v33-stable",
-          {
-            "sensitivity": 4,
-            "opt_out_rule_ids": [
-              "owasp-crs-v030301-id942350-sqli",
-              "owasp-crs-v030301-id942360-sqli"
-            ]
-          }
-        )
-      EOT
+      description = "Low-reputation VPN providers (preview first)"
+    }
+
+    anon_proxies = {
+      action      = "deny(403)"
+      priority    = 1400
+      feed        = "iplist-anon-proxies"
+      description = "Deny traffic from known open anonymous proxies"
+    }
+
+    tor_exit_nodes = {
+      action      = "deny(403)"
+      priority    = 1500
+      feed        = "iplist-tor-exit-nodes"
+      description = "Tor exit nodes"
+    }
+
+    allow_crawlers = {
+      action      = "allow"
+      priority    = 1600
+      feed        = "iplist-search-engines-crawlers"
+      description = "Allow search engine crawlers"
     }
   }
-}
 
-###############################################################################
-# Regional Health Check
-###############################################################################
-resource "google_compute_region_health_check" "hc" {
-  name   = "app-hc"
-  region = var.region
 
-  http_health_check {
-    port_specification = "USE_FIXED_PORT"
-    port               = 80
-    request_path       = "/"
+re_configured_rules = {
+    waf_sqli = {
+      action            = "deny(403)"
+      priority          = 3000
+      target_rule_set   = "sqli-v33-stable"
+      sensitivity_level = 1
+      description       = "OWASP CRS: SQL Injection Protection (v33-stable)"
+    }
+
+    waf_xss = {
+      action            = "deny(403)"
+      priority          = 3010
+      target_rule_set   = "xss-v33-stable"
+      sensitivity_level = 1
+      description       = "OWASP CRS: Cross-Site Scripting Protection (v33-stable)"
+    }
+
+    waf_lfi = {
+      action            = "deny(403)"
+      priority          = 3020
+      target_rule_set   = "lfi-v33-stable"
+      sensitivity_level = 1
+      description       = "OWASP CRS: Local File Inclusion Protection (v33-stable)"
+    }
+
+    waf_rce = {
+      action            = "deny(403)"
+      priority          = 3030
+      target_rule_set   = "rce-v33-stable"
+      sensitivity_level = 1
+      description       = "OWASP CRS: Remote Code Execution Protection (v33-stable)"
+    }
+
+    waf_rfi = {
+      action            = "deny(403)"
+      priority          = 3040
+      target_rule_set   = "rfi-v33-stable"
+      sensitivity_level = 1
+      description       = "OWASP CRS: Remote File Inclusion Protection (v33-stable)"
+    }
+
+    waf_method_enforcement = {
+      action            = "deny(403)"
+      priority          = 3050
+      target_rule_set   = "methodenforcement-v33-stable"
+      sensitivity_level = 1
+      description       = "OWASP CRS: HTTP Method Enforcement (v33-stable)"
+    }
+
+    waf_scanner_detection = {
+      action            = "deny(403)"
+      priority          = 3060
+      target_rule_set   = "scannerdetection-v33-stable"
+      sensitivity_level = 1
+      description       = "OWASP CRS: Scanner Detection (v33-stable)"
+    }
+
+    waf_protocol_attack = {
+      action            = "deny(403)"
+      priority          = 3070
+      target_rule_set   = "protocolattack-v33-stable"
+      sensitivity_level = 1
+      description       = "OWASP CRS: Protocol Attack Protection (v33-stable)"
+    }
+
+    waf_php = {
+      action            = "deny(403)"
+      priority          = 3080
+      target_rule_set   = "php-v33-stable"
+      sensitivity_level = 1
+      description       = "OWASP CRS: PHP Injection Attack Protection (v33-stable)"
+    }
+
+    waf_session_fixation = {
+      action            = "deny(403)"
+      priority          = 3090
+      target_rule_set   = "sessionfixation-v33-stable"
+      sensitivity_level = 1
+      description       = "OWASP CRS: Session Fixation Protection (v33-stable)"
+    }
+
+    waf_java = {
+      action            = "deny(403)"
+      priority          = 3100
+      target_rule_set   = "java-v33-stable"
+      sensitivity_level = 1
+      description       = "OWASP CRS: Java Attack Protection (v33-stable)"
+    }
+
+    waf_nodejs = {
+      action            = "deny(403)"
+      priority          = 3110
+      target_rule_set   = "nodejs-v33-stable"
+      sensitivity_level = 1
+      description       = "OWASP CRS: Node.js Attack Protection (v33-stable)"
+    }
   }
 
-  timeout_sec         = 5
-  check_interval_sec  = 5
-  healthy_threshold   = 2
-  unhealthy_threshold = 2
+  
+  security_rules = {}
+  custom_rules   = {}
+
+resource "google_compute_backend_service" "default" {
+  name                            = "dummy-backend-service"
+  connection_draining_timeout_sec = 0
+  load_balancing_scheme           = "EXTERNAL_MANAGED"
+  port_name                       = "http"
+  protocol                        = "HTTP"
+  session_affinity                = "NONE"
+  timeout_sec                     = 30
+  security_policy                 = "my-test-security-policy" 
+  project                         = local.project_id
 }
 
-###############################################################################
-# Regional Backend Service with Cloud Armor
-###############################################################################
-resource "google_compute_region_backend_service" "backend" {
-  provider              = google-beta
-  name                  = "app-backend"
-  region                = var.region
-  protocol              = "HTTP"
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-  timeout_sec           = 30
-  port_name             = var.backend_named_port_name
-
-  health_checks = [google_compute_region_health_check.hc.id]
-
-  backend {
-    group           = data.google_compute_instance_group.app.self_link
-    balancing_mode  = "UTILIZATION"
-    capacity_scaler = 1.0
-  }
-
-  security_policy = module.regional_cloud_armor.policy.self_link
-}
-
-###############################################################################
-# URL Map, Proxy, Forwarding Rule
-###############################################################################
-resource "google_compute_region_url_map" "url_map" {
-  name   = "app-url-map"
-  region = var.region
-
-  default_service = google_compute_region_backend_service.backend.id
-}
-
-resource "google_compute_region_target_http_proxy" "http_proxy" {
-  name    = "app-http-proxy"
-  region  = var.region
-  url_map = google_compute_region_url_map.url_map.id
-}
-
-resource "google_compute_address" "lb_ip" {
-  name   = "app-lb-ip"
-  region = var.region
-}
-
-resource "google_compute_forwarding_rule" "http" {
-  name                  = "app-http-fr"
-  region                = var.region
-  ip_protocol           = "TCP"
-  port_range            = "80"
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-  target                = google_compute_region_target_http_proxy.http_proxy.id
-  ip_address            = google_compute_address.lb_ip.self_link
-  allow_global_access   = true
-}
-
-###############################################################################
-# Outputs
-###############################################################################
-output "regional_lb_ip" {
-  value = google_compute_address.lb_ip.address
-}
-
-output "regional_http_endpoint" {
-  value = "http://${google_compute_address.lb_ip.address}"
-}
