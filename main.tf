@@ -163,4 +163,3 @@ module "security_policy" {
   custom_rules   = {}
 } # ✅ IMPORTANT: closes the module block
 
-'''
