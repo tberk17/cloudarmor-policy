@@ -163,15 +163,3 @@ module "security_policy" {
 } # ✅ IMPORTANT: closes the module block
 
 
-resource "google_compute_backend_service" "default" {
-  name                            = "dummy-backend-service"
-  connection_draining_timeout_sec = 0
-  load_balancing_scheme           = "EXTERNAL_MANAGED"
-  port_name                       = "http"
-  protocol                        = "HTTP"
-  session_affinity                = "NONE"
-  timeout_sec                     = 30
-  project                         = var.project_id
-
-  
-}
