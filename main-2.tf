@@ -1,39 +1,36 @@
 module "security_policy" {
-  # Regional submodule (required for regional external ALB)
   source  = "GoogleCloudPlatform/cloud-armor/google//modules/regional-backend-security-policy"
   version = "7.0.0"
 
   project_id          = var.project_id
-  name                = "my-test-security-policy-ew1"   # you can keep name, but see note below
+  region              = "europe-west1"
+
+  name                = "my-test-security-policy-ew1"
   description         = "Test Security Policy"
   default_rule_action = "allow"
   type                = "CLOUD_ARMOR"
 
-  # REQUIRED for regional policy:
-  region = "europe-west1"
-
-  # NOTE: layer_7_ddos_defense_* removed (global-only Adaptive Protection settings)
-  # Your rules below are unchanged.
-
-  threat_intelligence_rules = {
+  # Threat Intelligence rules -> must be expressed as custom_rules in the regional module
+  # Uses evaluateThreatIntelligence('FEED_NAME') as per Cloud Armor Threat Intelligence docs
+  custom_rules = {
     malicious_ips = {
       action      = "deny(403)"
       priority    = 1100
-      feed        = "iplist-known-malicious-ips"
+      expression  = "evaluateThreatIntelligence('iplist-known-malicious-ips')"
       description = "Deny traffic from known malicious IPs"
     }
 
     crypto_miners = {
       action      = "deny(403)"
       priority    = 1200
-      feed        = "iplist-crypto-miners"
+      expression  = "evaluateThreatIntelligence('iplist-crypto-miners')"
       description = "Deny traffic from known crypto miners IP list"
     }
 
     vpn_providers = {
       action      = "deny(403)"
       priority    = 1300
-      feed        = "iplist-vpn-providers"
+      expression  = "evaluateThreatIntelligence('iplist-vpn-providers')"
       preview     = true
       description = "Low-reputation VPN providers (preview first)"
     }
@@ -41,25 +38,26 @@ module "security_policy" {
     anon_proxies = {
       action      = "deny(403)"
       priority    = 1400
-      feed        = "iplist-anon-proxies"
+      expression  = "evaluateThreatIntelligence('iplist-anon-proxies')"
       description = "Deny traffic from known open anonymous proxies"
     }
 
     tor_exit_nodes = {
       action      = "deny(403)"
       priority    = 1500
-      feed        = "iplist-tor-exit-nodes"
+      expression  = "evaluateThreatIntelligence('iplist-tor-exit-nodes')"
       description = "Tor exit nodes"
     }
 
     allow_crawlers = {
       action      = "allow"
       priority    = 1600
-      feed        = "iplist-search-engines-crawlers"
+      expression  = "evaluateThreatIntelligence('iplist-search-engines-crawlers')"
       description = "Allow search engine crawlers"
     }
   }
 
+  # WAF rules unchanged
   pre_configured_rules = {
     waf_sqli = {
       action            = "deny(403)"
@@ -159,5 +157,4 @@ module "security_policy" {
   }
 
   security_rules = {}
-  custom_rules   = {}
 }
