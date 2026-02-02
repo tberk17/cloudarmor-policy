@@ -1,4 +1,4 @@
-'''
+/**
 module "security_policy" {
   source  = "GoogleCloudPlatform/cloud-armor/google"
   version = "7.0.0"
