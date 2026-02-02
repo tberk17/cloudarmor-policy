@@ -1,4 +1,3 @@
-
 module "security_policy" {
   source  = "GoogleCloudPlatform/cloud-armor/google"
   version = "7.0.0"
@@ -9,11 +8,31 @@ module "security_policy" {
   default_rule_action = "allow"
   type                = "CLOUD_ARMOR"
 
-  # IMPORTANT:
-  # Module docs state L7 DDoS (Adaptive Protection) is only supported for GLOBAL security policies of type CLOUD_ARMOR.
-  # If you're using a regional external ALB, keep this false. [1](https://docs.cloud.google.com/load-balancing/docs/https/ext-http-lb-tf-module-examples)
-  layer_7_ddos_defense_enable          = false
+  
+  layer_7_ddos_defense_enable          = true
   layer_7_ddos_defense_rule_visibility = "STANDARD"
+
+  
+  adaptive_protection_auto_deploy = {
+    enable        = true
+    priority      = 900
+    action        = "redirect"          # OR "deny(403)"
+    redirect_type = "GOOGLE_RECAPTCHA"  # matches doc's redirect-to-reCAPTCHA approach
+  }
+
+ 
+  layer_7_ddos_defense_threshold_configs = [
+    {
+      name                               = "ap-autodeploy-thresholds"
+      auto_deploy_confidence_threshold   = 0.8
+      auto_deploy_impacted_baseline_threshold = 0.005
+      auto_deploy_expiration_sec         = 7200
+
+      # Optional: keep default load threshold (0.8) unless your team wants different
+      # auto_deploy_load_threshold       = 0.8
+    }
+  ]
+
 
   threat_intelligence_rules = {
     malicious_ips = {
@@ -22,14 +41,12 @@ module "security_policy" {
       feed        = "iplist-known-malicious-ips"
       description = "Deny traffic from known malicious IPs"
     }
-
     crypto_miners = {
       action      = "deny(403)"
       priority    = 1200
       feed        = "iplist-crypto-miners"
       description = "Deny traffic from known crypto miners IP list"
     }
-
     vpn_providers = {
       action      = "deny(403)"
       priority    = 1300
@@ -37,21 +54,18 @@ module "security_policy" {
       preview     = true
       description = "Low-reputation VPN providers (preview first)"
     }
-
     anon_proxies = {
       action      = "deny(403)"
       priority    = 1400
       feed        = "iplist-anon-proxies"
       description = "Deny traffic from known open anonymous proxies"
     }
-
     tor_exit_nodes = {
       action      = "deny(403)"
       priority    = 1500
       feed        = "iplist-tor-exit-nodes"
       description = "Tor exit nodes"
     }
-
     allow_crawlers = {
       action      = "allow"
       priority    = 1600
@@ -60,7 +74,6 @@ module "security_policy" {
     }
   }
 
-  # FIXED NAME: pre_configured_rules (not re_configured_rules) [1](https://docs.cloud.google.com/load-balancing/docs/https/ext-http-lb-tf-module-examples)
   pre_configured_rules = {
     waf_sqli = {
       action            = "deny(403)"
@@ -69,7 +82,6 @@ module "security_policy" {
       sensitivity_level = 1
       description       = "OWASP CRS: SQL Injection Protection (v33-stable)"
     }
-
     waf_xss = {
       action            = "deny(403)"
       priority          = 3010
@@ -77,7 +89,6 @@ module "security_policy" {
       sensitivity_level = 1
       description       = "OWASP CRS: Cross-Site Scripting Protection (v33-stable)"
     }
-
     waf_lfi = {
       action            = "deny(403)"
       priority          = 3020
@@ -85,7 +96,6 @@ module "security_policy" {
       sensitivity_level = 1
       description       = "OWASP CRS: Local File Inclusion Protection (v33-stable)"
     }
-
     waf_rce = {
       action            = "deny(403)"
       priority          = 3030
@@ -93,7 +103,6 @@ module "security_policy" {
       sensitivity_level = 1
       description       = "OWASP CRS: Remote Code Execution Protection (v33-stable)"
     }
-
     waf_rfi = {
       action            = "deny(403)"
       priority          = 3040
@@ -101,7 +110,6 @@ module "security_policy" {
       sensitivity_level = 1
       description       = "OWASP CRS: Remote File Inclusion Protection (v33-stable)"
     }
-
     waf_method_enforcement = {
       action            = "deny(403)"
       priority          = 3050
@@ -109,7 +117,6 @@ module "security_policy" {
       sensitivity_level = 1
       description       = "OWASP CRS: HTTP Method Enforcement (v33-stable)"
     }
-
     waf_scanner_detection = {
       action            = "deny(403)"
       priority          = 3060
@@ -117,7 +124,6 @@ module "security_policy" {
       sensitivity_level = 1
       description       = "OWASP CRS: Scanner Detection (v33-stable)"
     }
-
     waf_protocol_attack = {
       action            = "deny(403)"
       priority          = 3070
@@ -125,7 +131,6 @@ module "security_policy" {
       sensitivity_level = 1
       description       = "OWASP CRS: Protocol Attack Protection (v33-stable)"
     }
-
     waf_php = {
       action            = "deny(403)"
       priority          = 3080
@@ -133,7 +138,6 @@ module "security_policy" {
       sensitivity_level = 1
       description       = "OWASP CRS: PHP Injection Attack Protection (v33-stable)"
     }
-
     waf_session_fixation = {
       action            = "deny(403)"
       priority          = 3090
@@ -141,7 +145,6 @@ module "security_policy" {
       sensitivity_level = 1
       description       = "OWASP CRS: Session Fixation Protection (v33-stable)"
     }
-
     waf_java = {
       action            = "deny(403)"
       priority          = 3100
@@ -149,7 +152,6 @@ module "security_policy" {
       sensitivity_level = 1
       description       = "OWASP CRS: Java Attack Protection (v33-stable)"
     }
-
     waf_nodejs = {
       action            = "deny(403)"
       priority          = 3110
@@ -161,5 +163,4 @@ module "security_policy" {
 
   security_rules = {}
   custom_rules   = {}
-} # ✅ IMPORTANT: closes the module block
-
+}
