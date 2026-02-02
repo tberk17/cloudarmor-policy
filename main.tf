@@ -1,3 +1,4 @@
+'''
 module "security_policy" {
   source  = "GoogleCloudPlatform/cloud-armor/google"
   version = "7.0.0"
@@ -162,4 +163,4 @@ module "security_policy" {
   custom_rules   = {}
 } # ✅ IMPORTANT: closes the module block
 
-
+'''
